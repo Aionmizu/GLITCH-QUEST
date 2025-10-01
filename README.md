@@ -42,7 +42,23 @@ Depuis la racine du dépôt:
 - Tests: `dotnet test`
 - Exécution (console app): `dotnet run --project Game.csproj`
 
-Résultat actuel: bandeau d’accueil; les services (combat, exploration, save) sont testés mais l’UI n’est pas connectée.
+Au lancement, un écran titre s’affiche:
+- Nouvelle Partie
+- Charger (slot1–slot3) avec prévisualisation
+- Quitter
+
+Contrôles en jeu:
+- Flèches: se déplacer
+- Entrée: interagir (PNJ @, coffre §, porte +)
+- M: Menu Joueur (sauvegarde, inventaire/usage d’objets, reprise)
+- Échap: quitter
+
+Progression rapide:
+1) Parc: ouvrez un coffre § pour obtenir la Clé du Parc, puis utilisez la porte + → Laboratoire.
+2) Laboratoire: récupérez la clé dans un coffre, puis porte + → Noyau.
+3) Noyau: avec les 3 clés, ouvrez la PORTE FINALE et affrontez le boss.
+
+Rencontres: marcher sur `~` déclenche des combats (12% par pas, data‑driven par zone). Victoire → XP et petit loot.
 
 ## Données
 - moves.json, enemies.json, typechart.json, et cartes ASCII sous `data/`.

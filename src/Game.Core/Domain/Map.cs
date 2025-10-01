@@ -8,7 +8,7 @@ public sealed class Map
     public int Height { get; }
     public Tile[,] Tiles { get; }
     public (int X, int Y)? PlayerSpawn { get; }
-    public EncounterTable? Encounters { get; init; }
+    public EncounterTable? Encounters { get; set; }
 
     public Map(Tile[,] tiles, (int X, int Y)? playerSpawn, EncounterTable? encounters = null)
     {

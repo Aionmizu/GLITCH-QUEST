@@ -38,10 +38,69 @@ public sealed class ConsoleRenderer : IRenderer
 
     public void DrawDialogue(params string[] lines)
     {
-        // Simple dialogue: separate from map with a blank line
-        Console.WriteLine();
+        // Dialogue with word-wrapping and simple pagination so messages are not immediately overwritten.
+        if (lines == null || lines.Length == 0)
+        {
+            Console.WriteLine();
+            return;
+        }
+
+        int width;
+        try { width = Math.Max(20, Console.WindowWidth - 2); }
+        catch { width = 80; }
+
+        // Prepare wrapped lines
+        var wrapped = new List<string>();
         foreach (var l in lines)
-            Console.WriteLine($"> {l}");
+        {
+            foreach (var w in Wrap($"> {l}", width))
+                wrapped.Add(w);
+        }
+
+        Console.WriteLine();
+        int linesPerPage;
+        try { linesPerPage = Math.Max(5, Console.WindowHeight - 5); }
+        catch { linesPerPage = 12; }
+
+        int index = 0;
+        while (index < wrapped.Count)
+        {
+            int end = Math.Min(index + linesPerPage, wrapped.Count);
+            for (int i = index; i < end; i++)
+                Console.WriteLine(wrapped[i]);
+
+            index = end;
+            if (index < wrapped.Count)
+            {
+                Console.WriteLine("-- Suite -- Appuyez sur une touche pour continuer --");
+                try { Console.ReadKey(true); } catch { /* ignore in headless */ }
+            }
+        }
+
+        static IEnumerable<string> Wrap(string text, int maxWidth)
+        {
+            if (string.IsNullOrEmpty(text)) { yield return string.Empty; yield break; }
+            var words = text.Split(' ');
+            var line = new StringBuilder();
+            foreach (var word in words)
+            {
+                if (line.Length == 0)
+                {
+                    line.Append(word);
+                }
+                else if (line.Length + 1 + word.Length <= maxWidth)
+                {
+                    line.Append(' ').Append(word);
+                }
+                else
+                {
+                    yield return line.ToString();
+                    line.Clear();
+                    line.Append(word);
+                }
+            }
+            if (line.Length > 0) yield return line.ToString();
+        }
     }
 
     public void DrawBattleStatus(Character a, Character b)

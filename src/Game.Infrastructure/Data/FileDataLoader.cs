@@ -22,6 +22,8 @@ public sealed class FileDataLoader
         _root = root;
     }
 
+    public sealed record EnemyTemplate(string Id, string Name, Element Type, Stats BaseStats, List<string> MoveIds);
+
     public IEnumerable<string> ReadMapLines(string mapId)
     {
         var path = Path.Combine(_root, "data", "maps", mapId + ".txt");
@@ -87,6 +89,28 @@ public sealed class FileDataLoader
         return dict;
     }
 
+    /// <summary>
+    /// Load all enemies from data/enemies.json. Returns a dictionary by id.
+    /// </summary>
+    public Dictionary<string, EnemyTemplate> LoadEnemies()
+    {
+        var path = Path.Combine(_root, "data", "enemies.json");
+        var result = new Dictionary<string, EnemyTemplate>(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(path)) return result;
+        var json = File.ReadAllText(path);
+        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var list = JsonSerializer.Deserialize<List<EnemyDto>>(json, opts) ?? new List<EnemyDto>();
+        foreach (var e in list)
+        {
+            if (string.IsNullOrWhiteSpace(e.Id)) continue;
+            if (!Enum.TryParse<Element>(e.Type, true, out var elem)) elem = Element.Normal;
+            var baseStats = new Stats(e.BaseStats.Hp, e.BaseStats.Mp, e.BaseStats.Atk, e.BaseStats.Def, e.BaseStats.Spd, e.BaseStats.Acc, e.BaseStats.Eva);
+            var tmpl = new EnemyTemplate(e.Id, e.Name ?? e.Id, elem, baseStats, e.Moves?.ToList() ?? new List<string>());
+            result[e.Id] = tmpl;
+        }
+        return result;
+    }
+
     private sealed class MoveDto
     {
         public string Id { get; set; } = string.Empty;
@@ -97,5 +121,27 @@ public sealed class FileDataLoader
         public double Accuracy { get; set; } = 1.0;
         public int MpCost { get; set; }
         public double CritChance { get; set; } = 0.1;
+    }
+
+    private sealed class EnemyDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = "Normal";
+        public int MinLvl { get; set; }
+        public int MaxLvl { get; set; }
+        public List<string> Moves { get; set; } = new();
+        public StatBlock BaseStats { get; set; } = new();
+    }
+
+    public sealed class StatBlock
+    {
+        public int Hp { get; set; }
+        public int Mp { get; set; }
+        public int Atk { get; set; }
+        public int Def { get; set; }
+        public int Spd { get; set; }
+        public double Acc { get; set; } = 1.0;
+        public double Eva { get; set; } = 1.0;
     }
 }

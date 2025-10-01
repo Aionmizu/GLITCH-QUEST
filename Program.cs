@@ -34,34 +34,12 @@ var typeChart = data.LoadTypeChart();
 var battleService = new BattleService(rng, typeChart);
 var menuService = new MenuService();
 
-// Load default map ("parc") and build exploration state
+// Initialize after Title Menu selection
 string currentMapId = "parc";
-Map map;
-try
-{
-    var lines = data.ReadMapLines(currentMapId);
-    map = exploration.LoadMapFromAscii(lines);
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Erreur de chargement de la carte: {ex.Message}");
-    Console.WriteLine("Assurez-vous que data/maps/parc.txt existe.");
-    return;
-}
-var state = new ExplorationState(map);
-
-// Player and inventory (simple defaults)
-var player = new PlayerCharacter(
-    name: "Hero",
-    level: 1,
-    type: Element.Fire,
-    baseStats: new Stats(30, 10, 6, 5, 5, 1.0, 1.0),
-    archetype: Archetype.Balanced
-);
-// Basic moves — used later when battle UI is wired
-player.Moves.Add(new Move { Id = "tackle", Name = "Tacle", Type = Element.Normal, Power = 35, Kind = DamageKind.Physical, Accuracy = 0.98, MpCost = 0, CritChance = 0.05 });
-player.Moves.Add(new Move { Id = "ember", Name = "Flammèche", Type = Element.Fire, Power = 40, Kind = DamageKind.Magic, Accuracy = 0.95, MpCost = 3, CritChance = 0.10 });
-var inventory = new Inventory();
+Map map = new Map(new Tile[1,1] { { new Tile(TileType.Floor, '.', true) } }, (0,0));
+ExplorationState state = new ExplorationState(map);
+PlayerCharacter player = new PlayerCharacter("Hero", 1, Element.Normal, new Stats(10, 5, 1, 1, 1, 1.0, 1.0), Archetype.Balanced);
+Inventory inventory = new Inventory();
 
 void DrawHud()
 {
@@ -81,12 +59,48 @@ void LoadMapAndRespawn(string mapId)
 {
     var lines = data.ReadMapLines(mapId);
     map = exploration.LoadMapFromAscii(lines);
+    // Attach simple encounter tables per map (data-driven wiring)
+    map.Encounters = BuildEncounterTableFor(mapId);
     state = new ExplorationState(map);
     currentMapId = mapId;
     Render();
 }
 
 EnemyCharacter? _currentEnemy = null; // used only for status rendering in Choose()
+
+// Helper: encounter tables per map (simple built-in tables; can be moved to data later)
+EncounterTable BuildEncounterTableFor(string mapId)
+{
+    // Zone-specific tables with moderated levels and mixed types to avoid one-shots
+    if (string.Equals(mapId, "parc", StringComparison.OrdinalIgnoreCase))
+    {
+        return new EncounterTable(new[]
+        {
+            new EncounterEntry("sprout", 1, 2, 50),
+            new EncounterEntry("bugling", 2, 3, 30),
+            new EncounterEntry("gelblob", 2, 3, 20)
+        });
+    }
+    if (string.Equals(mapId, "labo", StringComparison.OrdinalIgnoreCase))
+    {
+        return new EncounterTable(new[]
+        {
+            new EncounterEntry("bugling", 3, 4, 30),
+            new EncounterEntry("emberling", 3, 4, 40),
+            new EncounterEntry("gelblob", 3, 4, 30)
+        });
+    }
+    if (string.Equals(mapId, "noyau", StringComparison.OrdinalIgnoreCase))
+    {
+        return new EncounterTable(new[]
+        {
+            new EncounterEntry("vinebeast", 4, 6, 35),
+            new EncounterEntry("emberling", 5, 6, 35),
+            new EncounterEntry("bugling", 5, 6, 30)
+        });
+    }
+    return new EncounterTable(new[] { new EncounterEntry("sprout", 1, 2, 100) });
+}
 
 // === Battle UI helpers ===
 MenuOption? Choose(string title, IReadOnlyList<MenuOption> options, int startIndex = 0)
@@ -141,11 +155,31 @@ MenuOption? Choose(string title, IReadOnlyList<MenuOption> options, int startInd
 }
 
 
-bool RunBattle()
+EnemyCharacter CreateEnemyFromId(string enemyId, int level, Dictionary<string, Game.Infrastructure.Data.FileDataLoader.EnemyTemplate> enemyCatalog, Dictionary<string, Move> moveCatalog)
 {
-    // Create a simple enemy for now (Electric Bugling)
-    _currentEnemy = new EnemyCharacter("Bugling", 2, Element.Electric, new Stats(24, 8, 6, 4, 5, 1.0, 1.0), new SimpleAiStrategy());
-    _currentEnemy.Moves.Add(new Move { Id = "spark", Name = "Étincelle", Type = Element.Electric, Power = 45, Kind = DamageKind.Physical, Accuracy = 0.90, MpCost = 4, CritChance = 0.10 });
+    if (enemyCatalog.TryGetValue(enemyId, out var tmpl))
+    {
+        var e = new EnemyCharacter(tmpl.Name, level, tmpl.Type, tmpl.BaseStats, new SimpleAiStrategy());
+        foreach (var mvId in tmpl.MoveIds)
+        {
+            if (moveCatalog.TryGetValue(mvId, out var mv)) e.Moves.Add(mv);
+        }
+        // Fallback if no moves mapped
+        if (e.Moves.Count == 0)
+        {
+            e.Moves.Add(new Move { Id = "spark", Name = "Étincelle", Type = Element.Electric, Power = 45, Kind = DamageKind.Physical, Accuracy = 0.90, MpCost = 4, CritChance = 0.10 });
+        }
+        return e;
+    }
+    // Fallback hardcoded enemy
+    var def = new EnemyCharacter("Bugling", Math.Max(1, level), Element.Electric, new Stats(24, 8, 6, 4, 5, 1.0, 1.0), new SimpleAiStrategy());
+    def.Moves.Add(new Move { Id = "spark", Name = "Étincelle", Type = Element.Electric, Power = 45, Kind = DamageKind.Physical, Accuracy = 0.90, MpCost = 4, CritChance = 0.10 });
+    return def;
+}
+
+bool RunBattleWith(string enemyId, int level, Dictionary<string, Game.Infrastructure.Data.FileDataLoader.EnemyTemplate> enemyCatalog, Dictionary<string, Move> moveCatalog)
+{
+    _currentEnemy = CreateEnemyFromId(enemyId, level, enemyCatalog, moveCatalog);
 
     // Battle loop
     while (player.Current.Hp > 0 && _currentEnemy.Current.Hp > 0)
@@ -182,8 +216,7 @@ bool RunBattle()
             if (itemOpt is null) continue; // back
             var item = (Item)itemOpt.Tag!;
             playerIntent = menuService.CreateIntentForItem(player, player, item);
-            // consume item if used (we remove immediately; effect still applies via BattleService)
-            inventory.Remove(item);
+            // note: defer removal until after turn resolution; remove only if actually used
         }
         else
         {
@@ -212,6 +245,10 @@ bool RunBattle()
         foreach (var m in tr.EndOfTurnMessages) Console.WriteLine($"> {m}");
         renderer.Present();
         input.ReadKey();
+
+        // Consume item only if player's action actually used it this turn
+        if (tr.FirstAction?.Actor == player && tr.FirstAction.UsedItem is Item used1) inventory.Remove(used1);
+        if (tr.SecondAction?.Actor == player && tr.SecondAction.UsedItem is Item used2) inventory.Remove(used2);
 
         // Check flee/victory/defeat
         if (tr.FirstAction?.Fled == true)
@@ -251,14 +288,29 @@ Console.WriteLine();
 
 // Load catalogs for potential reconstruction on load
 var moveCatalog = data.LoadMoves();
+var enemyCatalog = data.LoadEnemies();
 
-// Simple Title Menu: New / Load (slot1) / Quit
+// Simple Title Menu: New / Load (slots) / Quit
+string FormatSlotPreview(string slotId)
+{
+    var s = saveService.Load(slotId);
+    if (s is null) return $"Charger ({slotId})";
+    var time = s.SavedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    return $"Charger ({slotId}) — {s.MapId} @ ({s.PlayerX},{s.PlayerY}) — {time}";
+}
+
 MenuOption? TitleMenu()
 {
+    var slots = saveService.ListSlots().ToHashSet(StringComparer.OrdinalIgnoreCase);
+    bool s1 = slots.Contains("slot1");
+    bool s2 = slots.Contains("slot2");
+    bool s3 = slots.Contains("slot3");
     var opts = new List<MenuOption>
     {
         new("Nouvelle Partie", true, "new"),
-        new("Charger (slot1)", saveService.Load("slot1") != null, "load1"),
+        new(FormatSlotPreview("slot1"), s1, "load1"),
+        new(FormatSlotPreview("slot2"), s2, "load2"),
+        new(FormatSlotPreview("slot3"), s3, "load3"),
         new("Quitter", true, "quit")
     };
     return ChooseSimple("↑/↓ puis Entrée", opts);
@@ -272,6 +324,7 @@ void StartNewGame()
     {
         var lines = data.ReadMapLines(currentMapId);
         map = exploration.LoadMapFromAscii(lines);
+      map.Encounters = BuildEncounterTableFor(currentMapId);
     }
     catch (Exception ex)
     {
@@ -286,7 +339,7 @@ void StartNewGame()
         name: "Hero",
         level: 1,
         type: Element.Fire,
-        baseStats: new Stats(30, 10, 6, 5, 5, 1.0, 1.0),
+        baseStats: new Stats(40, 12, 6, 7, 6, 1.0, 1.0),
         archetype: Archetype.Balanced
     );
     player.Moves.Clear();
@@ -307,6 +360,7 @@ bool TryLoadFromSlot(string slotId)
     currentMapId = save.MapId;
     var lines = data.ReadMapLines(currentMapId);
     map = exploration.LoadMapFromAscii(lines);
+    map.Encounters = BuildEncounterTableFor(currentMapId);
     state = new ExplorationState(map, save.PlayerX, save.PlayerY);
 
     // Player
@@ -359,6 +413,20 @@ while (true)
     {
         if (TryLoadFromSlot("slot1")) { Console.Clear(); break; }
         Console.WriteLine("Aucune sauvegarde sur slot1.");
+        Console.WriteLine("Appuyez sur une touche.");
+        input.ReadKey();
+    }
+    else if (Equals(sel.Tag, "load2"))
+    {
+        if (TryLoadFromSlot("slot2")) { Console.Clear(); break; }
+        Console.WriteLine("Aucune sauvegarde sur slot2.");
+        Console.WriteLine("Appuyez sur une touche.");
+        input.ReadKey();
+    }
+    else if (Equals(sel.Tag, "load3"))
+    {
+        if (TryLoadFromSlot("slot3")) { Console.Clear(); break; }
+        Console.WriteLine("Aucune sauvegarde sur slot3.");
         Console.WriteLine("Appuyez sur une touche.");
         input.ReadKey();
     }
@@ -436,7 +504,7 @@ void ShowPlayerMenu()
     {
         var options = new List<MenuOption>
         {
-            new("Sauvegarder (slot1)", true, "save"),
+            new("Sauvegarder…", true, "save_menu"),
             new("Inventaire", true, "inv"),
             new("Reprendre", true, "resume"),
             new("Quitter le jeu", true, "quit")
@@ -448,30 +516,65 @@ void ShowPlayerMenu()
             Render();
             return;
         }
-        if (Equals(sel.Tag, "save"))
+        if (Equals(sel.Tag, "save_menu"))
         {
-            var save = BuildSave();
-            saveService.Save("slot1", save);
-            Console.Clear();
-            Console.WriteLine("Sauvegarde effectuée sur slot1.");
-            Console.WriteLine($"Carte: {save.MapId}  Pos: ({save.PlayerX},{save.PlayerY})  Heure: {save.SavedAtUtc:HH:mm:ss}");
-            Console.WriteLine("Appuyez sur une touche pour revenir au jeu.");
-            input.ReadKey();
+            while (true)
+            {
+                var saveOptions = new List<MenuOption>
+                {
+                    new(FormatSlotPreview("slot1"), true, "slot1"),
+                    new(FormatSlotPreview("slot2"), true, "slot2"),
+                    new(FormatSlotPreview("slot3"), true, "slot3"),
+                    new("Retour", true, "back")
+                };
+                var pick = ChooseSimple("Choisissez un slot de sauvegarde", saveOptions);
+                if (pick is null || Equals(pick.Tag, "back")) break;
+                var slotId = (string)pick.Tag!;
+                var save = BuildSave() with { SlotId = slotId };
+                saveService.Save(slotId, save);
+                Console.Clear();
+                Console.WriteLine($"Sauvegarde effectuée sur {slotId}.");
+                Console.WriteLine($"Carte: {save.MapId}  Pos: ({save.PlayerX},{save.PlayerY})  Heure: {save.SavedAtUtc:HH:mm:ss}");
+                Console.WriteLine("Appuyez sur une touche pour revenir au menu.");
+                input.ReadKey();
+            }
         }
         else if (Equals(sel.Tag, "inv"))
         {
-            Console.Clear();
-            Console.WriteLine("Inventaire:");
-            foreach (var i in inventory.Items)
+            while (true)
             {
-                Console.WriteLine("- " + i.Name);
+                Console.Clear();
+                var invOptions = new List<MenuOption>();
+                foreach (var it in inventory.Items)
+                {
+                    var usable = it.CanUseOn(player);
+                    invOptions.Add(new MenuOption(it.Name, usable, it));
+                }
+                invOptions.Add(new MenuOption("Retour", true, "back"));
+                Console.WriteLine("INVENTAIRE — sélectionnez un objet à utiliser (si possible):");
+                var pick = ChooseSimple("↑/↓ puis Entrée", invOptions);
+                if (pick is null || Equals(pick.Tag, "back")) break;
+                var chosen = pick.Tag as Item;
+                if (chosen is not null)
+                {
+                    if (chosen.CanUseOn(player))
+                    {
+                        chosen.UseOn(player);
+                        // Consommer seulement les consommables (ici: potions)
+                        if (chosen is PotionHP || chosen is PotionMP || chosen is StatBoostItem)
+                            inventory.Remove(chosen);
+                        Console.WriteLine($"Vous utilisez {chosen.Name}.");
+                        Console.WriteLine("Appuyez sur une touche pour continuer.");
+                        input.ReadKey();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Objet non utilisable maintenant.");
+                        input.ReadKey();
+                    }
+                }
             }
-            var keyList = inventory.Items.OfType<KeyItem>().Select(k => k.KeyId).ToList();
-            Console.WriteLine();
-            Console.WriteLine("Clés: " + (keyList.Count == 0 ? "(aucune)" : string.Join(", ", keyList)));
-            Console.WriteLine();
-            Console.WriteLine("Appuyez sur une touche pour revenir.");
-            input.ReadKey();
+            Render();
         }
         else if (Equals(sel.Tag, "quit"))
         {
@@ -505,33 +608,84 @@ while (true)
             var lines = new List<string>();
             bool handled = false;
 
-            if (interaction.TryOpenChestAtPlayer(state, inventory, new KeyItem(Progression.KeyParc, "Clé du Parc")))
+            // Chest reward depends on current map
+            Item chestReward = currentMapId switch
             {
-                lines.Add("Vous trouvez : Clé du Parc. Elle ouvrira une Porte '+'.");
+                "parc" => new KeyItem(Progression.KeyParc, "Clé du Parc"),
+                "labo" => new KeyItem(Progression.KeyLaboratoire, "Clé du Laboratoire"),
+                "noyau" => new KeyItem(Progression.KeyNoyau, "Clé du Noyau"),
+                _ => new PotionHP(20)
+            };
+            if (interaction.TryOpenChestAtPlayer(state, inventory, chestReward))
+            {
+                lines.Add(chestReward is KeyItem
+                    ? $"Vous trouvez : {chestReward.Name}. Elle ouvrira une Porte '+'."
+                    : $"Vous trouvez : {chestReward.Name}. Ajoutée à l’inventaire.");
                 handled = true;
             }
-            else if (interaction.TryOpenFinalDoorAtPlayer(state, inventory))
+            else if (currentMapId == "noyau" && interaction.TryOpenFinalDoorAtPlayer(state, inventory))
             {
-                lines.Add("Vous ouvrez la porte finale avec vos trois clés !");
+                lines.Add("Vous ouvrez la PORTE FINALE avec vos trois clés !");
                 handled = true;
+                // Trigger boss battle
+                var bossId = enemyCatalog.ContainsKey("final_boss") ? "final_boss" : "bugling";
+                var survivedBoss = RunBattleWith(bossId, 7, enemyCatalog, moveCatalog);
+                if (survivedBoss)
+                {
+                    Console.Clear();
+                    Console.WriteLine("Le Noyau est purgé. VICTOIRE ! Merci d'avoir joué.");
+                    renderer.Present();
+                    input.ReadKey();
+                    Environment.Exit(0);
+                }
+                else
+                {
+                    Console.Clear();
+                    Console.WriteLine("Vous tombez face au boss du Noyau… Réessayez après vous être renforcé.");
+                    renderer.Present();
+                    input.ReadKey();
+                    Environment.Exit(0);
+                }
             }
-            else if (interaction.TryOpenDoorAtPlayer(state, inventory, Progression.KeyParc))
+            else if (currentMapId == "parc" && interaction.TryOpenDoorAtPlayer(state, inventory, Progression.KeyParc))
             {
                 lines.Add("Porte: la clé du Parc ouvre la serrure.");
                 LoadMapAndRespawn("labo");
                 handled = true;
             }
+            else if (currentMapId == "labo" && interaction.TryOpenDoorAtPlayer(state, inventory, Progression.KeyLaboratoire))
+            {
+                lines.Add("Porte: la clé du Laboratoire ouvre la serrure.");
+                LoadMapAndRespawn("noyau");
+                handled = true;
+            }
             else if (interaction.TryTalkToNpcAtPlayer(state, out _, ""))
             {
-                // PNJ: vrai dialogue avec lore et conseils. Voir lore.md pour les détails.
-                var npcLines = new[]
+                // PNJ: Atlas — dialogue variant selon progression (voir lore.md)
+                int keyCount = inventory.Items.OfType<KeyItem>().Count();
+                var npcLines = new List<string>();
+                npcLines.Add("Archiviste Atlas : Ah, un voyageur vivant… Bienvenue dans les Ruines du Terminal.");
+                if (keyCount == 0)
                 {
-                    "Archiviste Atlas : Ah, un voyageur vivant… Bienvenue dans les Ruines du Terminal.",
-                    "Pour franchir la GRANDE PORTE, il te faudra trois clés : Parc, Laboratoire et Noyau.",
-                    "Les symboles du monde : # mur, . sol, ~ herbe (rencontres), § coffre, @ PNJ, + porte.",
-                    "Cherche les coffres et écoute le bourdonnement des Glitches dans l’herbe.",
-                    "Reviens me voir quand tu auras une clé — je te dirai où aller ensuite."
-                };
+                    npcLines.Add("Pour franchir la GRANDE PORTE, il te faudra trois clés : Parc, Laboratoire et Noyau.");
+                    npcLines.Add("Les symboles : # mur, . sol, ~ herbe (rencontres), § coffre, @ PNJ, + porte.");
+                    npcLines.Add("Commence par fouiller les coffres (§) du Parc. L’herbe ~ attire les Glitches.");
+                }
+                else if (keyCount == 1)
+                {
+                    npcLines.Add("Bien vu pour ta première clé. La suivante est dans le Laboratoire : cherche la porte + marquée près d’ici.");
+                    npcLines.Add("Reste prudent : les couloirs étroits et les Glitches y sont nombreux.");
+                }
+                else if (keyCount == 2)
+                {
+                    npcLines.Add("Il ne te manque plus que la clé du Noyau. Ses pulsations corrompent jusqu’aux herbes.");
+                    npcLines.Add("Garde des potions à portée. La Porte finale ne cède qu’aux trois signatures.");
+                }
+                else
+                {
+                    npcLines.Add("Tu portes les trois clés. La GRANDE PORTE est prête à s’ouvrir — au-delà, le Noyau.");
+                    npcLines.Add("Lorsque tu seras prêt, approche la porte + et engage-toi. Que le Terminal t’accorde la stabilité.");
+                }
                 lines.AddRange(npcLines);
                 handled = true;
             }
@@ -574,14 +728,24 @@ while (true)
         if (exploration.ShouldTriggerEncounter(t))
         {
             Console.Beep(800, 120);
-            // Launch the actual battle loop
-            var survived = RunBattle();
+            // Determine encounter (data-driven if available)
+            var pick = exploration.PickRandomEncounter(map);
+            var enemyId = pick?.EnemyId ?? "bugling";
+            var level = pick?.Level ?? 2;
+
+            var survived = RunBattleWith(enemyId, level, enemyCatalog, moveCatalog);
             if (!survived)
             {
                 Console.Clear();
                 Console.WriteLine("Vous reprenez vos esprits à l'entrée du Parc… (prototype)\nJeu terminé pour cette session.");
                 renderer.Present();
                 break;
+            }
+            else
+            {
+                // Simple reward prototype
+                player.GainXp(20);
+                inventory.Add(new PotionHP(10));
             }
             Render();
             continue;

@@ -4,36 +4,63 @@
     "name": "Bugling",
     "type": "Electric",
     "minLvl": 2,
-    "maxLvl": 4,
-    "moves": ["spark", "tackle"],
-    "baseStats": {"hp": 18, "mp": 8, "atk": 7, "def": 5, "spd": 6, "acc": 1.0, "eva": 1.0}
+    "maxLvl": 3,
+    "moves": ["spark", "jab"],
+    "baseStats": {"hp": 22, "mp": 8, "atk": 6, "def": 6, "spd": 6, "acc": 1.0, "eva": 1.0}
   },
   {
     "id": "sprout",
     "name": "Pousse",
     "type": "Grass",
     "minLvl": 1,
-    "maxLvl": 3,
-    "moves": ["vinewhip", "tackle"],
-    "baseStats": {"hp": 20, "mp": 6, "atk": 6, "def": 5, "spd": 5, "acc": 1.0, "eva": 1.0}
+    "maxLvl": 2,
+    "moves": ["sproutshot", "vinewhip"],
+    "baseStats": {"hp": 24, "mp": 6, "atk": 5, "def": 6, "spd": 5, "acc": 1.0, "eva": 1.0}
   },
   {
     "id": "emberling",
     "name": "Braiseux",
     "type": "Fire",
     "minLvl": 3,
-    "maxLvl": 5,
+    "maxLvl": 4,
     "moves": ["ember", "slam"],
-    "baseStats": {"hp": 22, "mp": 10, "atk": 8, "def": 6, "spd": 6, "acc": 1.0, "eva": 1.0}
+    "baseStats": {"hp": 26, "mp": 10, "atk": 7, "def": 7, "spd": 6, "acc": 1.0, "eva": 1.0}
   },
   {
     "id": "aquapup",
     "name": "Aqualouv",
     "type": "Water",
     "minLvl": 3,
-    "maxLvl": 6,
-    "moves": ["splash", "waterjet"],
-    "baseStats": {"hp": 24, "mp": 10, "atk": 7, "def": 6, "spd": 6, "acc": 1.0, "eva": 1.0}
+    "maxLvl": 5,
+    "moves": ["bubble", "waterjet"],
+    "baseStats": {"hp": 28, "mp": 10, "atk": 6, "def": 7, "spd": 6, "acc": 1.0, "eva": 1.0}
+  },
+  {
+    "id": "cinderimp",
+    "name": "Impie Cendreux",
+    "type": "Fire",
+    "minLvl": 2,
+    "maxLvl": 4,
+    "moves": ["flare", "ember"],
+    "baseStats": {"hp": 22, "mp": 10, "atk": 6, "def": 5, "spd": 7, "acc": 1.0, "eva": 1.0}
+  },
+  {
+    "id": "gelblob",
+    "name": "Gelblob",
+    "type": "Water",
+    "minLvl": 2,
+    "maxLvl": 4,
+    "moves": ["splash", "bubble"],
+    "baseStats": {"hp": 26, "mp": 12, "atk": 5, "def": 7, "spd": 5, "acc": 1.0, "eva": 1.0}
+  },
+  {
+    "id": "vinebeast",
+    "name": "Végétor",
+    "type": "Grass",
+    "minLvl": 3,
+    "maxLvl": 5,
+    "moves": ["vinewhip", "razorleaf"],
+    "baseStats": {"hp": 30, "mp": 8, "atk": 7, "def": 7, "spd": 5, "acc": 1.0, "eva": 1.0}
   },
   {
     "id": "final_boss",
@@ -42,6 +69,6 @@
     "minLvl": 8,
     "maxLvl": 8,
     "moves": ["thunderbolt", "spark", "slam"],
-    "baseStats": {"hp": 80, "mp": 30, "atk": 12, "def": 10, "spd": 9, "acc": 1.0, "eva": 1.0}
+    "baseStats": {"hp": 90, "mp": 30, "atk": 11, "def": 12, "spd": 8, "acc": 1.0, "eva": 1.0}
   }
 ]
