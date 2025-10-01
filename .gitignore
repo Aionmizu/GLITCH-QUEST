@@ -1,0 +1,29 @@
+﻿# Dotnet build output
+[Bb]in/
+[Oo]bj/
+[Tt]est[Rr]esults/
+*.nupkg
+*.snupkg
+
+# VS / Rider / IDE
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local data caches
+/.cache/
+
+# Exclude local TODO from VCS (requested)
+/TODO.md

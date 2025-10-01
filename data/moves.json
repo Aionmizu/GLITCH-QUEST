@@ -1,0 +1,4 @@
+﻿[
+  {"id":"ember","name":"Flammèche","type":"Fire","power":40,"kind":"Physical","accuracy":0.95,"mpCost":3,"critChance":0.1},
+  {"id":"spark","name":"Étincelle","type":"Electric","power":45,"kind":"Physical","accuracy":0.9,"mpCost":4,"critChance":0.1}
+]

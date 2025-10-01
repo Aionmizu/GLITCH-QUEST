@@ -1,0 +1,4 @@
+﻿[
+  {"id":"bugling","name":"Bugling","type":"Electric","minLvl":2,"maxLvl":4,
+   "moves":["spark"],"baseStats":{"hp":18,"mp":6,"atk":7,"def":5,"spd":6,"acc":1.0,"eva":1.0}}
+]
