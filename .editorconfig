@@ -1,0 +1,18 @@
+﻿root = true
+
+[*.cs]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+end_of_line = crlf
+
+# C# code style
+csharp_new_line_before_open_brace = all
+csharp_indent_block_contents = true
+csharp_indent_switch_labels = true
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Nullable warnings are enabled in projects

@@ -13,8 +13,16 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="src\Game.Application\Game.Application.csproj" />
-        <ProjectReference Include="src\Game.Core\Game.Core.csproj" />
-    </ItemGroup>
+    <ProjectReference Include="src\Game.Application\Game.Application.csproj" />
+    <ProjectReference Include="src\Game.Core\Game.Core.csproj" />
+    <ProjectReference Include="src\Game.Infrastructure\Game.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Copy data files (maps, JSON) to output so the game can load them at runtime -->
+  <ItemGroup>
+    <Content Include="data\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
 </Project>

@@ -1,4 +1,16 @@
 ﻿[
-  {"id":"ember","name":"Flammèche","type":"Fire","power":40,"kind":"Physical","accuracy":0.95,"mpCost":3,"critChance":0.1},
-  {"id":"spark","name":"Étincelle","type":"Electric","power":45,"kind":"Physical","accuracy":0.9,"mpCost":4,"critChance":0.1}
+  {"id":"tackle","name":"Tacle","type":"Normal","power":35,"kind":"Physical","accuracy":0.98,"mpCost":0,"critChance":0.05},
+  {"id":"slam","name":"Coup de bélier","type":"Normal","power":55,"kind":"Physical","accuracy":0.9,"mpCost":2,"critChance":0.1},
+
+  {"id":"ember","name":"Flammèche","type":"Fire","power":40,"kind":"Magic","accuracy":0.95,"mpCost":3,"critChance":0.1},
+  {"id":"fireball","name":"Boule de feu","type":"Fire","power":70,"kind":"Magic","accuracy":0.9,"mpCost":6,"critChance":0.15},
+
+  {"id":"splash","name":"Éclaboussure","type":"Water","power":35,"kind":"Magic","accuracy":0.97,"mpCost":2,"critChance":0.05},
+  {"id":"waterjet","name":"Jet d'eau","type":"Water","power":65,"kind":"Magic","accuracy":0.92,"mpCost":5,"critChance":0.1},
+
+  {"id":"vinewhip","name":"Fouet lianes","type":"Grass","power":45,"kind":"Physical","accuracy":0.95,"mpCost":2,"critChance":0.1},
+  {"id":"razorleaf","name":"Tranch'herbe","type":"Grass","power":55,"kind":"Physical","accuracy":0.9,"mpCost":3,"critChance":0.2},
+
+  {"id":"spark","name":"Étincelle","type":"Electric","power":45,"kind":"Physical","accuracy":0.93,"mpCost":3,"critChance":0.1},
+  {"id":"thunderbolt","name":"Tonnerre","type":"Electric","power":80,"kind":"Magic","accuracy":0.88,"mpCost":7,"critChance":0.15}
 ]

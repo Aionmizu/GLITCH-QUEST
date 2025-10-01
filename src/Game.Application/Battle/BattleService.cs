@@ -24,7 +24,7 @@ public sealed class BattleService
         return clamped;
     }
 
-    public int ComputeDamage(Character attacker, Character defender, Move move)
+    private DamageDetails ComputeDamageDetailed(Character attacker, Character defender, Move move)
     {
         var atkStat = attacker.BaseStats.Atk;
         // Burn reduces attack by 20%
@@ -34,14 +34,23 @@ public sealed class BattleService
         var baseVal = (atkStat * move.Power) / (double)defStat;
 
         var rand = _rng.NextDouble(0.85, 1.00);
-        var crit = _rng.NextDouble() < move.CritChance ? 1.5 : 1.0;
-        var stab = move.Type == attacker.Type ? 1.2 : 1.0;
+        var isCrit = _rng.NextDouble() < move.CritChance;
+        var crit = isCrit ? 1.5 : 1.0;
+        var hasStab = move.Type == attacker.Type;
+        var stab = hasStab ? 1.2 : 1.0;
         var typeMul = _chart.GetMultiplier(move.Type, defender.Type);
 
         var mult = rand * crit * stab * typeMul;
         var raw = baseVal * mult;
-        var dmg = (int)Math.Round(raw);
-        return Math.Max(1, dmg);
+        var dmg = Math.Max(1, (int)Math.Round(raw));
+        return new DamageDetails(dmg, isCrit, typeMul, rand, hasStab);
+    }
+
+    public int ComputeDamage(Character attacker, Character defender, Move move)
+    {
+        // Preserve public API used by tests
+        var details = ComputeDamageDetailed(attacker, defender, move);
+        return details.Damage;
     }
 
     public TurnResult ResolveTurn(ActionIntent a1, ActionIntent a2)
@@ -61,19 +70,25 @@ public sealed class BattleService
         first.Actor.RegenMpPercent(0.10);
         second.Actor.RegenMpPercent(0.10);
 
-        // End of turn: Burn DoT (5% of base HP)
+        // End of turn: Burn DoT (5% of base HP) and messages
+        var endMessages = new List<string>();
         void ApplyBurnDot(Character c)
         {
             if (c.Status == StatusAilment.Burn && c.Current.Hp > 0)
             {
                 var dot = Math.Max(1, (int)Math.Round(c.BaseStats.Hp * 0.05));
                 c.TakeDamage(dot);
+                endMessages.Add($"{c.Name} souffre de brûlure (-{dot} PV).");
             }
         }
         ApplyBurnDot(first.Actor);
         ApplyBurnDot(second.Actor);
 
-        return new TurnResult(r1, r2, first.Actor, second.Actor);
+        var tr = new TurnResult(r1, r2, first.Actor, second.Actor)
+        {
+            EndOfTurnMessages = endMessages
+        };
+        return tr;
     }
 
     private TurnActionResult? Execute(ActionIntent intent, Character opponent, bool skipIfDead = false)
@@ -89,20 +104,31 @@ public sealed class BattleService
                 var tgt = target!;
 
                 if (skipIfDead || tgt.Current.Hp <= 0)
-                    return new TurnActionResult(attacker, tgt, intent.Move, false, 0, tgt.Current.Hp <= 0);
+                    return new TurnActionResult(attacker, tgt, intent.Move, false, 0, tgt.Current.Hp <= 0)
+                    {
+                        Messages = new List<string> { $"{attacker.Name} ne peut pas attaquer, la cible est à terre." }
+                    };
 
                 // Paralysis: 25% chance to be fully paralyzed (skip turn) BEFORE paying MP
                 if (attacker.Status == StatusAilment.Paralysis)
                 {
                     if (_rng.NextDouble() < 0.25)
                     {
-                        return new TurnActionResult(attacker, tgt, intent.Move, false, 0, tgt.Current.Hp <= 0);
+                        return new TurnActionResult(attacker, tgt, intent.Move, false, 0, tgt.Current.Hp <= 0)
+                        {
+                            Messages = new List<string> { $"{attacker.Name} est paralysé ! L'action échoue." }
+                        };
                     }
                 }
 
                 // Pay MP if needed
                 if (!attacker.UseMp(intent.Move!.MpCost))
-                    return new TurnActionResult(attacker, tgt, intent.Move, false, 0, false);
+                    return new TurnActionResult(attacker, tgt, intent.Move, false, 0, false)
+                    {
+                        Messages = new List<string> { $"{attacker.Name} n'a pas assez de MP pour {intent.Move!.Name}." }
+                    };
+
+                var messages = new List<string> { $"{attacker.Name} utilise {intent.Move!.Name} !" };
 
                 // Roll hit
                 var hitChance = ComputeHitChance(attacker, tgt, intent.Move);
@@ -111,18 +137,39 @@ public sealed class BattleService
                 int damage = 0;
                 if (hit)
                 {
-                    damage = ComputeDamage(attacker, tgt, intent.Move);
+                    var details = ComputeDamageDetailed(attacker, tgt, intent.Move);
+                    damage = details.Damage;
                     tgt.TakeDamage(damage);
+
+                    // Effectiveness
+                    if (details.TypeMultiplier >= 1.5)
+                        messages.Add("C'est super efficace !");
+                    else if (details.TypeMultiplier <= 0.5)
+                        messages.Add("Ce n'est pas très efficace…");
+
+                    if (details.IsCrit)
+                        messages.Add("Coup critique !");
+
+                    messages.Add($"{tgt.Name} subit {damage} dégâts.");
                 }
-                return new TurnActionResult(attacker, tgt, intent.Move, hit, damage, tgt.Current.Hp <= 0);
+                else
+                {
+                    messages.Add("L'attaque manque sa cible !");
+                }
+                return new TurnActionResult(attacker, tgt, intent.Move, hit, damage, tgt.Current.Hp <= 0)
+                {
+                    Messages = messages
+                };
             }
             case ActionKind.UseItem:
             {
                 // Apply item effect; no MP cost and no hit/damage
-                intent.Item?.UseOn(target ?? actor);
-                return new TurnActionResult(actor, target, move: null, hit: false, damageDealt: 0, targetDeadAfter: (target ?? actor).Current.Hp <= 0)
+                var tgt = target ?? actor;
+                intent.Item?.UseOn(tgt);
+                return new TurnActionResult(actor, target, move: null, hit: false, damageDealt: 0, targetDeadAfter: tgt.Current.Hp <= 0)
                 {
-                    UsedItem = intent.Item
+                    UsedItem = intent.Item,
+                    Messages = new List<string> { $"{actor.Name} utilise {intent.Item?.Name}." }
                 };
             }
             case ActionKind.Defend:
@@ -130,7 +177,8 @@ public sealed class BattleService
                 // No concrete effect yet; can be extended later
                 return new TurnActionResult(actor, target, move: null, hit: false, damageDealt: 0, targetDeadAfter: target?.Current.Hp <= 0)
                 {
-                    Defended = true
+                    Defended = true,
+                    Messages = new List<string> { $"{actor.Name} se met en garde." }
                 };
             }
             case ActionKind.Flee:
@@ -149,14 +197,20 @@ public sealed class BattleService
                 }
                 return new TurnActionResult(actor, target, move: null, hit: false, damageDealt: 0, targetDeadAfter: target?.Current.Hp <= 0)
                 {
-                    Fled = success
+                    Fled = success,
+                    Messages = new List<string> { success ? $"{actor.Name} prend la fuite !" : $"{actor.Name} n'arrive pas à fuir !" }
                 };
             }
             default:
-                return new TurnActionResult(actor, target, intent.Move, false, 0, target?.Current.Hp <= 0);
+                return new TurnActionResult(actor, target, intent.Move, false, 0, target?.Current.Hp <= 0)
+                {
+                    Messages = new List<string>()
+                };
         }
     }
 }
+
+public readonly record struct DamageDetails(int Damage, bool IsCrit, double TypeMultiplier, double RandomFactor, bool HasStab);
 
 public sealed class TurnActionResult
 {
@@ -171,6 +225,9 @@ public sealed class TurnActionResult
     public bool Fled { get; init; }
     public bool Defended { get; init; }
     public Item? UsedItem { get; init; }
+
+    // New: messages describing what happened during this action
+    public List<string> Messages { get; init; } = new();
 
     public TurnActionResult(Character actor, Character? target, Move? move, bool hit, int damageDealt, bool targetDeadAfter)
     {
@@ -189,6 +246,9 @@ public sealed class TurnResult
     public TurnActionResult? SecondAction { get; }
     public Character FirstActor { get; }
     public Character SecondActor { get; }
+
+    // New: end-of-turn messages (e.g., status DoT)
+    public List<string> EndOfTurnMessages { get; set; } = new();
 
     public TurnResult(TurnActionResult? firstAction, TurnActionResult? secondAction, Character firstActor, Character secondActor)
     {
