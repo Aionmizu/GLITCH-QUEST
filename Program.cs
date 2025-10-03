@@ -41,9 +41,27 @@ ExplorationState state = new ExplorationState(map);
 PlayerCharacter player = new PlayerCharacter("Hero", 1, Element.Normal, new Stats(10, 5, 1, 1, 1, 1.0, 1.0), Archetype.Balanced);
 Inventory inventory = new Inventory();
 
+int Clamp(int value, int min, int max) => value < min ? min : (value > max ? max : value);
+
+void SafeSetCursorPosition(int left, int top)
+{
+    try
+    {
+        int maxLeft = Math.Max(0, Console.BufferWidth - 1);
+        int maxTop = Math.Max(0, Console.BufferHeight - 1);
+        int safeLeft = Clamp(left, 0, maxLeft);
+        int safeTop = Clamp(top, 0, maxTop);
+        Console.SetCursorPosition(safeLeft, safeTop);
+    }
+    catch
+    {
+        // As an ultimate fallback (rare: when console I/O not available), ignore positioning.
+    }
+}
+
 void DrawHud()
 {
-    Console.SetCursorPosition(0, map.Height + 1);
+    SafeSetCursorPosition(0, map.Height + 1);
     Console.WriteLine("[Flèches] Se déplacer  |  [Entrée] Interagir  |  [M] Menu  |  [Échap] Quitter   ");
 }
 
@@ -709,7 +727,7 @@ while (true)
             }
 
             // Position the cursor below the HUD, then print the dialogue and wait for a keypress
-            Console.SetCursorPosition(0, map.Height + 2);
+            SafeSetCursorPosition(0, map.Height + 2);
             renderer.DrawDialogue(lines.ToArray());
             renderer.DrawDialogue("(Appuyez sur une touche pour continuer)");
             renderer.Present();
